@@ -1,5 +1,5 @@
 # src/app/endpoints/chat.py
-import time
+import time as _time
 from fastapi import APIRouter, HTTPException
 from app.logger import logger
 from schemas.request import GeminiRequest, OpenAIChatRequest
@@ -28,9 +28,9 @@ async def translate_chat(request: GeminiRequest):
 
 def convert_to_openai_format(response_text: str, model: str, stream: bool = False):
     return {
-        "id": f"chatcmpl-{int(time.time())}",
+        "id": f"chatcmpl-{int(_time.time())}",
         "object": "chat.completion.chunk" if stream else "chat.completion",
-        "created": int(time.time()),
+        "created": int(_time.time()),
         "model": model,
         "choices": [
             {
@@ -85,7 +85,11 @@ async def chat_completions(request: OpenAIChatRequest):
 
     if request.model:
         try:
+            logger.info(f"[chat_completions] Sending to model={request.model.value!r} prompt_chars={len(final_prompt)}")
+            t0 = _time.time()
             response = await gemini_client.generate_content(message=final_prompt, model=request.model.value, files=None)
+            elapsed = _time.time() - t0
+            logger.info(f"[chat_completions] Response received in {elapsed:.2f}s response_chars={len(response.text)}")
             return convert_to_openai_format(response.text, request.model.value, is_stream)
         except Exception as e:
             logger.error(f"Error in /v1/chat/completions endpoint: {e}", exc_info=True)

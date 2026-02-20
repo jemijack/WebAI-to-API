@@ -6,6 +6,10 @@ from app.utils.browser import get_cookie_from_browser
 
 # Import the specific exception to handle it gracefully
 from gemini_webapi.exceptions import AuthError
+from gemini_webapi import set_log_level
+
+# Enable full debug output from gemini_webapi so every HTTP call is visible in logs
+set_log_level("DEBUG")
 
 
 class GeminiClientNotInitializedError(Exception):
