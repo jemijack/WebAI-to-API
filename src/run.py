@@ -1,4 +1,5 @@
 # src/run.py
+import apply_patches  # must be first — patches gemini_webapi before any other import
 import argparse
 import asyncio
 import uvicorn
