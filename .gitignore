@@ -7,3 +7,4 @@ __pycache__
 config.conf
 generated_media
 har_and_cookies
+test.py
