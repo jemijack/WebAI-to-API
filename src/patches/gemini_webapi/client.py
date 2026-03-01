@@ -164,7 +164,7 @@ class GeminiClient(GemMixin):
             self.close_task = None
 
         if self.client:
-            await self.client.aclose()
+            self.client.close()
 
     async def reset_close_task(self) -> None:
         if self.close_task:
