@@ -28,11 +28,11 @@ class GRPC(StrEnum):
 
 class Headers(Enum):
     GEMINI = {
-        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         "Host": "gemini.google.com",
         "Origin": "https://gemini.google.com",
         "Referer": "https://gemini.google.com/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
         "X-Same-Domain": "1",
     }
     ROTATE_COOKIES = {
@@ -46,7 +46,13 @@ class Model(Enum):
     G_3_1_PRO = (
         "gemini-3.1-pro",
         {
-            "x-goog-ext-525001261-jspb": '[1,null,null,null,"e6fa609c3fa255c0",null,null,0,[4],null,null,2]'
+            "x-goog-ext-525001261-jspb": '[1,null,null,null,"e6fa609c3fa255c0",null,null,0,[4],null,null,2]',
+            "x-goog-ext-73010989-jspb":  "[0]",
+            "x-goog-ext-73010990-jspb":  "[0]",
+            "x-browser-channel":         "stable",
+            "x-browser-year":            "2025",
+            "x-browser-validation":      "H7foltZLl6dOJznTOoBwbVZN4eI=",
+            "x-browser-copyright":       "Copyright 2025 Google LLC. All Rights reserved.",
         },
         False,
     )

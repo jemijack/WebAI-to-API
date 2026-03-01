@@ -1,5 +1,6 @@
 import asyncio
 import re
+import uuid
 from asyncio import Task
 from pathlib import Path
 from typing import Any, Optional
@@ -39,6 +40,46 @@ from .utils import (
     running,
     upload_file,
 )
+
+
+def _build_pro31_freq(prompt: str, uuid_str: str, chat_metadata: list) -> str:
+    """
+    Build the 69-element f.req inner payload required by gemini-3.1-pro.
+
+    The UUID at position [59] must match the x-goog-ext-525005358-jspb header
+    value sent with the same request.
+    """
+    cid  = (chat_metadata[0] or "") if chat_metadata else ""
+    rid  = (chat_metadata[1] or "") if chat_metadata else ""
+    rcid = (chat_metadata[2] or "") if chat_metadata else ""
+
+    inner = [
+        [prompt, 0, None, None, None, None, 0],                          # [0]
+        ["en"],                                                            # [1]
+        [cid, rid, rcid, None, None, None, None, None, None, ""],         # [2]
+        "", "",                                                            # [3-4] state tokens (empty)
+        None,                                                              # [5]
+        [1], 1,                                                            # [6-7]
+        None, None,                                                        # [8-9]
+        1, 0,                                                              # [10-11]
+        None, None, None, None, None,                                      # [12-16]
+        [[0]], 0,                                                          # [17-18]
+        None, None, None, None, None, None, None, None,                    # [19-26]
+        1,                                                                 # [27]
+        None, None,                                                        # [28-29]
+        [4],                                                               # [30]
+        None, None, None, None, None, None, None, None, None, None,        # [31-40]
+        [1],                                                               # [41]
+        None, None, None, None, None, None, None, None, None, None, None, # [42-52]
+        0,                                                                 # [53]
+        None, None, None, None, None,                                      # [54-58]
+        uuid_str,                                                          # [59]
+        None,                                                              # [60]
+        [],                                                                # [61]
+        None, None, None, None, None, None,                                # [62-67]
+        2,                                                                 # [68]
+    ]
+    return json.dumps([None, json.dumps(inner).decode()]).decode()
 
 
 class GeminiClient(GemMixin):
@@ -239,6 +280,49 @@ class GeminiClient(GemMixin):
             f"endpoint={Endpoint.GENERATE.value}"
         )
 
+        # Build per-request headers and f.req payload, branching on model.
+        is_pro31 = (model == Model.G_3_1_PRO)
+
+        if is_pro31:
+            request_uuid = str(uuid.uuid4()).upper()
+            request_headers = {
+                **model.model_header,
+                "x-goog-ext-525005358-jspb": f'["{request_uuid}",1]',
+            }
+            f_req_value = _build_pro31_freq(
+                prompt,
+                request_uuid,
+                chat.metadata if chat else [None, None, None],
+            )
+        else:
+            request_headers = model.model_header
+            f_req_value = json.dumps(
+                [
+                    None,
+                    json.dumps(
+                        [
+                            files
+                            and [
+                                prompt,
+                                0,
+                                None,
+                                [
+                                    [
+                                        [await upload_file(file, self.proxy)],
+                                        parse_file_name(file),
+                                    ]
+                                    for file in files
+                                ],
+                            ]
+                            or [prompt],
+                            None,
+                            chat and chat.metadata,
+                        ]
+                        + (gem_id and [None] * 16 + [gem_id] or [])
+                    ).decode(),
+                ]
+            ).decode()
+
         try:
             async with AsyncSession(
                 timeout=self.timeout,
@@ -250,35 +334,10 @@ class GeminiClient(GemMixin):
             ) as session:
                 response = await session.post(
                     Endpoint.GENERATE.value,
-                    headers=model.model_header,
+                    headers=request_headers,
                     data={
                         "at": self.access_token,
-                        "f.req": json.dumps(
-                            [
-                                None,
-                                json.dumps(
-                                    [
-                                        files
-                                        and [
-                                            prompt,
-                                            0,
-                                            None,
-                                            [
-                                                [
-                                                    [await upload_file(file, self.proxy)],
-                                                    parse_file_name(file),
-                                                ]
-                                                for file in files
-                                            ],
-                                        ]
-                                        or [prompt],
-                                        None,
-                                        chat and chat.metadata,
-                                    ]
-                                    + (gem_id and [None] * 16 + [gem_id] or [])
-                                ).decode(),
-                            ]
-                        ).decode(),
+                        "f.req": f_req_value,
                     },
                 )
         except ReadTimeout:
@@ -314,7 +373,8 @@ class GeminiClient(GemMixin):
                         part_json = json.loads(part_body)
                         if get_nested_value(part_json, [4]):
                             body_index, body = part_index, part_json
-                            break
+                            # Don't break — 3.1-pro sends empty candidates in early
+                            # streaming frames; the final frame has the real text.
                     except json.JSONDecodeError:
                         continue
 
